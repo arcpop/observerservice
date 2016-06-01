@@ -28,7 +28,7 @@ var (
 
 type Notification interface {
     Handle()
-    Encode() []byte
+    Encode() string
 }
 
 type DriverListener struct {

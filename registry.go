@@ -3,6 +3,7 @@ package main
 import (
     "unicode/utf16"
     "encoding/binary"
+	"fmt"
 )
 
 //RegistryNotification represents a registry notification
@@ -26,15 +27,12 @@ func (n RegistryNotification) ParseFrom(b []byte) error {
 }
 
 //Encode encodes the notification to send it to the server
-func (n RegistryNotification) Encode() []byte {
-    var b [2]byte
-    buf := n.Encode()
-    binary.BigEndian.PutUint16(b[:], n.registryAction)
-    buf = append(buf, b[0], b[1])
-    binary.BigEndian.PutUint16(b[:], n.truncated)
-    buf = append(buf, b[0], b[1])
-    buf = append(buf, []byte(n.registryPath)...)
-    return buf
+func (n RegistryNotification) Encode() string {
+    return fmt.Sprintf("[Registry %d:%d] -> %s (%d)", 
+    n.currentProcessID, 
+    n.currentThreadID, 
+    n.registryPath, 
+    n.registryAction)
 }
 
 //Handle should perform actions upon receiving this type of notification

@@ -28,11 +28,12 @@ func (s *ObserverService) Execute(args []string, r <-chan svc.ChangeRequest, cha
     }
     
     incomingNotifications := make(chan Notification, NotificationQueueSize)
-    outgoingNotifications := make(chan []byte, NotificationQueueSize)
+    outgoingNotifications := make(chan string, NotificationQueueSize)
     defer close(incomingNotifications)
     defer close(outgoingNotifications)
     
-    go sendNotifications(serverAddr, outgoingNotifications)
+    go consolePrintNotifications(outgoingNotifications)
+    //go sendNotifications(serverAddr, outgoingNotifications)
     
     driverListener, err := createDriverListener(DriverName, incomingNotifications)
     if err != nil {
