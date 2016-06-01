@@ -95,7 +95,7 @@ func (n NotificationHeader) EncodeHeader() []byte {
 
 //ReadMessage reads a single notification from the driver
 func (dl *DriverListener) ReadMessage() (Notification, error) {
-    var buffer [20000]byte
+    buffer := make([]byte, 20000)
     n, err := syscall.Read(dl.handle, buffer[:])
     if err != nil {
         println("ReadMessage(): syscall.Read error: " + err.Error())
