@@ -1,13 +1,15 @@
 
 // +build windows
 
-package main
+package service
 
 import (
-    "syscall"
     "encoding/binary"
     "strconv"
     "errors"
+    "golang.org/x/sys/windows"
+	"fmt"
+	"syscall"
 )
 
 const (
@@ -32,13 +34,22 @@ type Notification interface {
 }
 
 type DriverListener struct {
-    handle syscall.Handle
+    handle windows.Handle
     doClose chan bool
 }
 
 func createDriverListener(driverName string, notifications chan Notification) (*DriverListener, error) {
-    fd, err := syscall.Open("\\\\.\\" + driverName, syscall.O_RDWR, 0)
+    fd, err := windows.CreateFile(
+        windows.StringToUTF16Ptr("\\\\.\\" + driverName), 
+        windows.GENERIC_READ,
+        windows.FILE_SHARE_READ,
+        nil,
+        windows.OPEN_EXISTING,
+        windows.FILE_FLAG_OVERLAPPED,
+        0)
+
     if err != nil {
+        println(err.Error())
         return nil, err
     }
     return &DriverListener{handle: fd, doClose: make(chan bool)}, nil
@@ -55,7 +66,7 @@ func (dl *DriverListener) ListenForNotifications() {
     for {
         select {
             case <- dl.doClose:
-                syscall.Close(dl.handle)
+                windows.Close(dl.handle)
                 return
             default:
                 dl.ReadMessage()
@@ -96,14 +107,29 @@ func (n NotificationHeader) EncodeHeader() []byte {
 //ReadMessage reads a single notification from the driver
 func (dl *DriverListener) ReadMessage() (Notification, error) {
     buffer := make([]byte, 20000)
-    n, err := syscall.Read(dl.handle, buffer[:])
+    var done uint32
+    event, err := windows.CreateEvent(nil, 1, 0, nil)
     if err != nil {
-        println("ReadMessage(): syscall.Read error: " + err.Error())
+        fmt.Printf("ReadMessage(): windows.CreateEvent error: %+v\n", err)
         return nil, err
     }
+    overlapped := windows.Overlapped{
+        HEvent: event,
+    }
+    err = windows.ReadFile(dl.handle, buffer[:], &done, &overlapped)
+    if err != nil {
+        errn, ok := err.(syscall.Errno)
+        if !ok || errn != windows.ERROR_IO_PENDING {
+            fmt.Printf("ReadMessage(): syscall.Read error: %+v\n", err)
+            return nil, err
+        }
+    }
+    ev, err := windows.WaitForSingleObject(event, windows.INFINITE)
+    fmt.Printf("ReadMessage(): windows.WaitForSingleObject error: %+v %T\n", err, err)
+    fmt.Printf("ReadMessage(): windows.WaitForSingleObject event: %+v %T\n", ev, ev)
     
-    if n < 4 {
-        println("ReadMessage(): Not enough bytes returned: ", strconv.FormatInt(int64(n), 10))
+    if done < 4 {
+        fmt.Println("ReadMessage(): Not enough bytes returned: ", strconv.FormatInt(int64(done), 10))
         return nil, ErrParsingFailed
     }
     notificationType := binary.BigEndian.Uint32(buffer[0:4])
@@ -112,7 +138,6 @@ func (dl *DriverListener) ReadMessage() (Notification, error) {
         rn := RegistryNotification{}
         rn.ParseFrom(buffer[0:])
         return rn, nil
-    case NotificationProcessCreated:
         
     }
     return nil, ErrInvalidNotificationType

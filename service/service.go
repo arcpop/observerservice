@@ -1,12 +1,21 @@
 
 // +build windows
 
-package main
+package service
 
 import (
     "golang.org/x/sys/windows/svc"
 	"fmt"
     "net"
+)
+
+const (
+    //NotificationQueueSize is the number of non blocking entries 
+    //in the notification queue (implemented over a channel)
+    NotificationQueueSize = 500
+
+    //DriverName is the dos name of the driver
+    DriverName = "Observer"
 )
 
 //ObserverService is an empty struct to implement svc.Handler
@@ -16,31 +25,38 @@ type ObserverService struct {}
 func (s *ObserverService) Execute(args []string, r <-chan svc.ChangeRequest, changes chan<- svc.Status) (ssec bool, errno uint32) {
     const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
     changes <- svc.Status{State: svc.StartPending}
+
     if len(args) <= 1 {
+        println("No args")
         changes <- svc.Status{State: svc.StopPending}
         return true, 10
     }
     
-    serverAddr, err := net.ResolveTCPAddr("tcp", args[1])
-    if err != nil {
-        changes <- svc.Status{State: svc.StopPending}
-        return true, 20
-    }
     
     incomingNotifications := make(chan Notification, NotificationQueueSize)
     outgoingNotifications := make(chan string, NotificationQueueSize)
     defer close(incomingNotifications)
     defer close(outgoingNotifications)
     
-    go consolePrintNotifications(outgoingNotifications)
-    //go sendNotifications(serverAddr, outgoingNotifications)
-    
+    if (args[1] != "console") {
+        serverAddr, err := net.ResolveTCPAddr("tcp", args[1])
+        if err != nil {
+            println("Failed to resolve server addr")
+            changes <- svc.Status{State: svc.StopPending}
+            return true, 20
+        }
+        go sendNotifications(serverAddr, outgoingNotifications)
+    } else {
+        go consolePrintNotifications(outgoingNotifications)
+    }
+
     driverListener, err := createDriverListener(DriverName, incomingNotifications)
     if err != nil {
+        println("Failed to create DriverListener")
         changes <- svc.Status{State: svc.Stopped}
         return false, 0
     }
-    defer driverListener.Close()
+    go driverListener.ListenForNotifications()
 
     changes <- svc.Status{State: svc.Running}
     
