@@ -5,7 +5,7 @@ import (
 )
 
 
-func sendNotifications(serverAddr *net.TCPAddr, outgoingNotifications chan string)  {
+func sendNotifications(serverAddr *net.TCPAddr, outgoingNotifications chan []byte)  {
     serverConn, err := net.DialTCP("tcp", nil, serverAddr)
     if err != nil {
         panic(err)

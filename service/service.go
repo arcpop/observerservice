@@ -34,7 +34,7 @@ func (s *ObserverService) Execute(args []string, r <-chan svc.ChangeRequest, cha
     
     
     incomingNotifications := make(chan Notification, NotificationQueueSize)
-    outgoingNotifications := make(chan string, NotificationQueueSize)
+    outgoingNotifications := make(chan []byte, NotificationQueueSize)
     defer close(incomingNotifications)
     defer close(outgoingNotifications)
     
@@ -50,23 +50,28 @@ func (s *ObserverService) Execute(args []string, r <-chan svc.ChangeRequest, cha
         go consolePrintNotifications(outgoingNotifications)
     }
 
-    driverListener, err := createDriverListener(DriverName, incomingNotifications)
-    if err != nil {
-        println("Failed to create DriverListener")
-        changes <- svc.Status{State: svc.Stopped}
-        return false, 0
+    for i := 0; i < 2; i++ {
+        driverListener, err := createDriverListener(DriverName, incomingNotifications)
+        if err != nil {
+            println("Failed to create DriverListener")
+            changes <- svc.Status{State: svc.Stopped}
+            return false, 0
+        }
+        go driverListener.ListenForNotifications()
     }
-    go driverListener.ListenForNotifications()
 
     changes <- svc.Status{State: svc.Running}
     
     for {
         select {
             case nft := <- incomingNotifications:
-                go func (notification Notification) {
-                    notification.Handle()
-                    outgoingNotifications <- notification.Encode()
-                } (nft)
+                    nft.Handle()
+                    buf, err := nft.Encode()
+                    if err != nil {
+                        fmt.Println(err)
+                        continue
+                    }
+                    outgoingNotifications <- buf
             case req := <- r:
                 switch req.Cmd {
                 case svc.Stop, svc.Shutdown:
