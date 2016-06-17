@@ -15,6 +15,10 @@ const (
     DefaultEncodingSize = 1024
 )
 const (
+    NotificationHeaderSize = 24
+)
+
+const (
     NotificationRegistry = 1
     NotificationThreadCreated = 2
     NotificationProcessCreated = 3
@@ -28,6 +32,7 @@ var (
 )
 
 type Notification interface {
+    ParseFrom([]byte) error
     Handle()
     Encode() ([]byte, error)
 }
@@ -83,26 +88,17 @@ type NotificationHeader struct {
 }
 
 //ParseFrom parses the notification header from a byte buffer
-func (n NotificationHeader) ParseFrom(b []byte) error {
+func (n* NotificationHeader) ParseFrom(b []byte) error {
     if len(b) < 24 {
         return ErrParsingFailed
     }
-    n.NotificationType = binary.BigEndian.Uint32(b[0:4])
-    n.Reaction = binary.BigEndian.Uint32(b[4:8])
-    n.CurrentProcessID = binary.BigEndian.Uint64(b[8:16])
-    n.CurrentThreadID = binary.BigEndian.Uint64(b[16:24])
+    n.NotificationType = binary.LittleEndian.Uint32(b[0:])
+    n.Reaction = binary.LittleEndian.Uint32(b[4:])
+    n.CurrentProcessID = binary.LittleEndian.Uint64(b[8:])
+    n.CurrentThreadID = binary.LittleEndian.Uint64(b[16:])
     return nil
 }
 
-//EncodeHeader is used so that NotificationHeader does not implement the Notification interface
-func (n NotificationHeader) EncodeHeader() []byte {
-    b := make([]byte, 24, DefaultEncodingSize)
-    binary.BigEndian.PutUint32(b[0:4], n.NotificationType)
-    binary.BigEndian.PutUint32(b[4:8], n.Reaction)
-    binary.BigEndian.PutUint64(b[8:16], n.CurrentProcessID)
-    binary.BigEndian.PutUint64(b[16:24], n.CurrentThreadID)
-    return b
-}
 
 //ReadMessage reads a single notification from the driver
 func (dl *DriverListener) ReadMessage() (Notification, error) {
@@ -118,14 +114,19 @@ func (dl *DriverListener) ReadMessage() (Notification, error) {
     }
 
     notificationType := binary.LittleEndian.Uint32(buffer[0:4])
+    var nft Notification
     switch notificationType {
     case NotificationRegistry:
-        rn := &RegistryNotification{}
-        err = rn.ParseFrom(buffer[0:n])
+        nft = &RegistryNotification{}
+    case NotificationProcessCreated:
+        nft = &ProcessCreationNotification{}
+    }
+    if nft != nil {
+        err = nft.ParseFrom(buffer[0:n])
         if err != nil {
             return nil, err
         }
-        return rn, nil
+        return nft, nil
     }
     return nil, ErrInvalidNotificationType
 }

@@ -15,14 +15,18 @@ type RegistryNotification struct {
     RegistryPath string
 }
 
+const (
+    MinRegistryNotificationSize = NotificationHeaderSize + 6
+)
+
 //ParseFrom parses the registry notification from a byte buffer
 func (n *RegistryNotification) ParseFrom(b []byte) error {
-    if len(b) < 30 {
+    if len(b) < MinRegistryNotificationSize {
         return ErrParsingFailed
     }
     n.NotificationHeader.ParseFrom(b)
-    n.RegistryAction = binary.BigEndian.Uint16(b[24:26])
-    n.Truncated = binary.BigEndian.Uint16(b[26:28])
+    n.RegistryAction = binary.LittleEndian.Uint16(b[24:26])
+    n.Truncated = binary.LittleEndian.Uint16(b[26:28])
     n.RegistryPath = decodeUnicodeByteBuffer(b[28:])
     return nil
 }
