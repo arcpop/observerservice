@@ -38,7 +38,7 @@ func (n *RegistryNotification) Encode() ([]byte, error) {
 
 //Handle should perform actions upon receiving this type of notification
 func (n *RegistryNotification) Handle() {
-    fmt.Println("Registry: " + n.RegistryPath)
+    fmt.Println("Registry: (" + n.NotificationHeader.CurrentProcess + ")" + n.RegistryPath)
 }
 
 func decodeUnicodeByteBuffer(b []byte) string {

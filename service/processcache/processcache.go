@@ -4,8 +4,8 @@ import (
     "golang.org/x/sys/windows"
 	"sync"
     "time"
-	"log"
 	"unsafe"
+	"log"
 )
 type processEntry struct {
     pe windows.ProcessEntry32
@@ -15,6 +15,7 @@ var processMap map[uint64]*processEntry
 var processMapLock sync.RWMutex
 
 func init()  {
+    processMap = make(map[uint64]*processEntry)
     tckr := time.NewTicker(time.Second * 5)
     go func (t *time.Ticker)  {
         for _ = range t.C {
@@ -25,7 +26,7 @@ func init()  {
 
 func updateProcessMap() {
     processMapLock.Lock()
-    defer processMapLock.RUnlock()
+    defer processMapLock.Unlock()
     processMap = make(map[uint64]*processEntry)
     handle, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
     if err != nil {
@@ -35,7 +36,7 @@ func updateProcessMap() {
     var pe windows.ProcessEntry32
     pe.Size = uint32(unsafe.Sizeof(pe))
     err = windows.Process32First(handle, &pe)
-    for err != nil {
+    for err == nil {
         processMap[uint64(pe.ProcessID)] = &processEntry{ 
             pe: pe,
             name: windows.UTF16ToString(pe.ExeFile[:]),

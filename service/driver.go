@@ -84,7 +84,7 @@ func (dl *DriverListener) ListenForNotifications() {
 type NotificationHeader struct {
     NotificationType uint32
     Reaction uint32
-    currentProcessID uint64
+    CurrentProcessID uint64
     CurrentProcess string
     CurrentThreadID uint64
 }
@@ -96,8 +96,8 @@ func (n* NotificationHeader) ParseFrom(b []byte) error {
     }
     n.NotificationType = binary.LittleEndian.Uint32(b[0:])
     n.Reaction = binary.LittleEndian.Uint32(b[4:])
-    n.currentProcessID = binary.LittleEndian.Uint64(b[8:])
-    n.CurrentProcess = processcache.ProcessNameByID(n.currentProcessID)
+    n.CurrentProcessID = binary.LittleEndian.Uint64(b[8:])
+    n.CurrentProcess = processcache.ProcessNameByID(n.CurrentProcessID)
     n.CurrentThreadID = binary.LittleEndian.Uint64(b[16:])
     return nil
 }
