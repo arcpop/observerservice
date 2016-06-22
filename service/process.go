@@ -4,8 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"encoding/binary"
-	"golang.org/x/sys/windows"
-	"unsafe"
+    "github.com/arcpop/observerservice/service/processcache"
 	"errors"
 )
 
@@ -40,8 +39,8 @@ func (n *ProcessCreationNotification) ParseFrom(b []byte) error {
     if truncated == 0 {
         n.ProcessName = decodeUnicodeByteBuffer(b[58:])
     } else {
-        name, err := findProcessNameByID(n.NewProcessID)
-        if err != nil {
+        name := processcache.ProcessNameByID(n.NewProcessID)
+        if name == "" {
             //Use truncated name anyway
             n.ProcessName = decodeUnicodeByteBuffer(b[58:])
         } else {
@@ -57,26 +56,4 @@ func (n *ProcessCreationNotification) Encode() ([]byte, error) {
 
 func (n *ProcessCreationNotification) Handle() {
     fmt.Println("Handle process created: " + n.ProcessName)
-}
-
-
-func findProcessNameByID(pid uint64) (string, error) {
-    var processEntry windows.ProcessEntry32
-    handle, err := windows.CreateToolhelp32Snapshot(windows.TH32CS_SNAPPROCESS, 0)
-    if err != nil {
-        return "", err
-    }
-    defer windows.CloseHandle(handle)
-    processEntry.Size = uint32(unsafe.Sizeof(processEntry))
-    for err = windows.Process32First(handle, &processEntry); 
-        err != nil;
-        err = windows.Process32Next(handle, &processEntry) {
-        if processEntry.ProcessID == uint32(pid) {
-            return windows.UTF16ToString(processEntry.ExeFile[:]), nil
-        }
-    }
-    if err != nil {
-        return "", err
-    }
-    return "", ErrProcessNotFound
 }
