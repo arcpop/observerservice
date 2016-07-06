@@ -123,6 +123,8 @@ func (dl *DriverListener) ReadMessage() (Notification, error) {
         nft = &RegistryNotification{}
     case NotificationProcessCreated:
         nft = &ProcessCreationNotification{}
+    case NotificationDriverLoad:
+        nft = &DriverLoadNotification{}
     }
     if nft != nil {
         err = nft.ParseFrom(buffer[0:n])

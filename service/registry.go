@@ -12,7 +12,8 @@ type RegistryNotification struct {
     NotificationHeader
     RegistryAction uint16
     Truncated uint16
-    RegistryPath string
+    ValueName string
+    KeyPath string
 }
 
 const (
@@ -27,7 +28,8 @@ func (n *RegistryNotification) ParseFrom(b []byte) error {
     n.NotificationHeader.ParseFrom(b)
     n.RegistryAction = binary.LittleEndian.Uint16(b[24:26])
     n.Truncated = binary.LittleEndian.Uint16(b[26:28])
-    n.RegistryPath = decodeUnicodeByteBuffer(b[28:])
+    n.ValueName = decodeUnicodeByteBuffer(b[28:156])
+    n.KeyPath = decodeUnicodeByteBuffer(b[156:])
     return nil
 }
 
@@ -38,7 +40,11 @@ func (n *RegistryNotification) Encode() ([]byte, error) {
 
 //Handle should perform actions upon receiving this type of notification
 func (n *RegistryNotification) Handle() {
-    fmt.Println("Registry: (" + n.NotificationHeader.CurrentProcess + ")" + n.RegistryPath)
+    if (n.RegistryAction == 4) {
+        fmt.Println("Registry SetValueKey: (" + n.NotificationHeader.CurrentProcess + ")" + "\n\tKey: " + n.KeyPath +  "\n\tValue: " + n.ValueName)
+    } else {
+        fmt.Println("Registry: (" + n.NotificationHeader.CurrentProcess + ")" + n.KeyPath)
+    }
 }
 
 func decodeUnicodeByteBuffer(b []byte) string {
